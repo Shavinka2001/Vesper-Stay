@@ -458,3 +458,64 @@ export type UpdateStaffRolePayload = {
 export type ResetStaffPasswordPayload = {
   password: string;
 };
+
+// ─── Channel Manager ─────────────────────────────────────────────────────────
+
+export type ChannelType =
+  | 'BOOKING_COM'
+  | 'AIRBNB'
+  | 'EXPEDIA'
+  | 'ICAL'
+  | 'OTHER';
+
+export type ChannelSyncStatus = 'IDLE' | 'SYNCING' | 'SUCCESS' | 'FAILED';
+
+export type ChannelSyncDirection = 'IMPORT' | 'EXPORT' | 'BIDIRECTIONAL';
+
+export type ChannelSyncLog = {
+  id: string;
+  status: ChannelSyncStatus;
+  direction: ChannelSyncDirection;
+  startedAt: string;
+  finishedAt: string | null;
+  recordsProcessed: number;
+  recordsFailed: number;
+  errorMessage: string | null;
+};
+
+export type ChannelConnection = {
+  id: string;
+  channelType: ChannelType;
+  name: string;
+  roomId: string | null;
+  isEnabled: boolean;
+  iCalImportUrl: string | null;
+  iCalExportUrl: string | null;
+  syncDirection: ChannelSyncDirection;
+  lastSyncedAt: string | null;
+  lastSyncStatus: ChannelSyncStatus;
+  lastSyncError: string | null;
+  createdAt: string;
+  room: { id: string; number: string } | null;
+  syncLogs?: ChannelSyncLog[];
+};
+
+export type CreateChannelConnectionPayload = {
+  channelType: ChannelType;
+  name: string;
+  roomId?: string;
+  iCalImportUrl?: string;
+  syncDirection?: ChannelSyncDirection;
+  isEnabled?: boolean;
+};
+
+export type UpdateChannelConnectionPayload =
+  Partial<CreateChannelConnectionPayload>;
+
+export type ChannelSyncResult = {
+  connectionId: string;
+  imported: number;
+  cancelled: number;
+  failed: number;
+  errors: string[];
+};

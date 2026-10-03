@@ -35,6 +35,10 @@ import type {
   ResetStaffPasswordPayload,
   StaffMember,
   UpdateStaffRolePayload,
+  ChannelConnection,
+  ChannelSyncResult,
+  CreateChannelConnectionPayload,
+  UpdateChannelConnectionPayload,
 } from '@/lib/types';
 
 const API_BASE_URL =
@@ -435,6 +439,60 @@ export async function deleteStaffMemberRequest(
 ): Promise<{ success: true }> {
   const { data } = await api.delete<ApiSuccessEnvelope<{ success: true }>>(
     `/staff/${staffId}`,
+  );
+  return data.data;
+}
+
+// ─── Channel Manager ─────────────────────────────────────────────────────────
+
+/** API origin without the trailing "/api" — used to build absolute iCal URLs. */
+export function apiOrigin(): string {
+  return API_BASE_URL.replace(/\/api\/?$/, '');
+}
+
+export async function fetchChannelConnections(): Promise<ChannelConnection[]> {
+  const { data } = await api.get<ApiSuccessEnvelope<ChannelConnection[]>>(
+    '/channel-manager/connections',
+  );
+  return data.data;
+}
+
+export async function createChannelConnectionRequest(
+  payload: CreateChannelConnectionPayload,
+): Promise<ChannelConnection> {
+  const { data } = await api.post<ApiSuccessEnvelope<ChannelConnection>>(
+    '/channel-manager/connections',
+    payload,
+  );
+  return data.data;
+}
+
+export async function updateChannelConnectionRequest(
+  id: string,
+  payload: UpdateChannelConnectionPayload,
+): Promise<ChannelConnection> {
+  const { data } = await api.patch<ApiSuccessEnvelope<ChannelConnection>>(
+    `/channel-manager/connections/${id}`,
+    payload,
+  );
+  return data.data;
+}
+
+export async function deleteChannelConnectionRequest(
+  id: string,
+): Promise<{ success: true }> {
+  const { data } = await api.delete<ApiSuccessEnvelope<{ success: true }>>(
+    `/channel-manager/connections/${id}`,
+  );
+  return data.data;
+}
+
+export async function syncChannelConnectionRequest(
+  id: string,
+): Promise<ChannelSyncResult> {
+  const { data } = await api.post<ApiSuccessEnvelope<ChannelSyncResult>>(
+    `/channel-manager/connections/${id}/sync`,
+    {},
   );
   return data.data;
 }
