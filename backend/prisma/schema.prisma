@@ -261,10 +261,11 @@ model Room {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomType RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
-  bookings Booking[]
-  orders   Order[]
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomType           RoomType            @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings           Booking[]
+  orders             Order[]
+  channelConnections ChannelConnection[]
 
   @@unique([propertyId, number])
   @@index([propertyId, status])
@@ -437,6 +438,8 @@ model Payment {
 model ChannelConnection {
   id                   String            @id @default(uuid())
   propertyId           String
+  /// The room this channel's calendar maps to (one listing ↔ one room).
+  roomId               String?
   channelType          ChannelType
   name                 String
   isEnabled            Boolean           @default(false)
@@ -455,12 +458,14 @@ model ChannelConnection {
   updatedAt            DateTime          @updatedAt
 
   property Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room     Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
   syncLogs ChannelSyncLog[]
 
   @@unique([propertyId, channelType, name])
   @@index([propertyId])
   @@index([propertyId, isEnabled])
   @@index([propertyId, channelType])
+  @@index([roomId])
   @@map("channel_connections")
 }
 
