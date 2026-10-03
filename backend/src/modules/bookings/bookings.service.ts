@@ -15,6 +15,7 @@ import type { CheckInDto } from '@modules/bookings/dto/check-in.dto';
 import type { CheckOutDto } from '@modules/bookings/dto/check-out.dto';
 import type { CreateBookingDto } from '@modules/bookings/dto/create-booking.dto';
 import type { UpdatableBookingStatus } from '@modules/bookings/dto/update-booking-status.dto';
+import { computeFolio } from '@modules/bookings/folio';
 import { WhatsAppService } from '@modules/whatsapp/whatsapp.service';
 import { PrismaService } from '@prisma/prisma.service';
 
@@ -691,65 +692,28 @@ export class BookingsService {
   private buildFolio(
     booking: Awaited<ReturnType<BookingsService['loadBookingWithFolio']>>,
   ) {
-    const checkIn = new Date(booking.checkInDate);
-    const checkOut = new Date(booking.checkOutDate);
-    const nights = Math.max(
-      1,
-      Math.round(
-        (checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000),
-      ),
-    );
-    const baseRate = Number(booking.room.roomType.baseRate);
-    const orderTotal =
-      Math.round(
-        booking.orders.reduce((sum, order) => sum + Number(order.totalAmount), 0) *
-          100,
-      ) / 100;
-    const catalogRoomCharge = Math.round(nights * baseRate * 100) / 100;
-    const derivedRoomCharge =
-      Math.round((Number(booking.totalAmount) - orderTotal) * 100) / 100;
-    const roomCharge =
-      derivedRoomCharge > 0 ? derivedRoomCharge : catalogRoomCharge;
-
-    const lines: Array<{
-      id: string;
-      kind: 'ROOM' | 'POS' | 'OTHER';
-      label: string;
-      amount: number;
-    }> = [
-      {
-        id: `room-${booking.id}`,
-        kind: 'ROOM',
-        label: `Room stay · ${booking.room.number} · ${nights} night${nights === 1 ? '' : 's'} × ${baseRate}`,
-        amount: roomCharge,
-      },
-      ...booking.orders.map((order) => ({
+    // Convert Prisma Decimals → numbers at the edge, then delegate the money
+    // math to the pure, exhaustively-tested computeFolio().
+    const computed = computeFolio({
+      bookingId: booking.id,
+      roomNumber: booking.room.number,
+      checkInDate: booking.checkInDate,
+      checkOutDate: booking.checkOutDate,
+      baseRate: Number(booking.room.roomType.baseRate),
+      bookingTotalAmount: Number(booking.totalAmount),
+      paidAmount: Number(booking.paidAmount),
+      orders: booking.orders.map((order) => ({
         id: order.id,
-        kind: 'POS' as const,
-        label: `F&B / Cabana · ${order.orderItems.map((i) => i.menuItem.name).join(', ') || 'Order'}`,
-        amount: Number(order.totalAmount),
+        totalAmount: Number(order.totalAmount),
+        itemNames: order.orderItems.map((i) => i.menuItem.name),
       })),
-    ];
-
-    const grandTotal = Math.round((roomCharge + orderTotal) * 100) / 100;
-    const paidAmount = Number(booking.paidAmount);
-    const balanceDue = Math.max(
-      0,
-      Math.round((grandTotal - paidAmount) * 100) / 100,
-    );
+    });
 
     return {
       bookingId: booking.id,
       confirmationCode: booking.confirmationCode,
       currency: booking.currency,
-      nights,
-      baseRate,
-      roomCharge,
-      orderTotal,
-      lines,
-      grandTotal,
-      paidAmount,
-      balanceDue,
+      ...computed,
       payments: booking.payments.map((payment) => ({
         id: payment.id,
         amount: Number(payment.amount),
