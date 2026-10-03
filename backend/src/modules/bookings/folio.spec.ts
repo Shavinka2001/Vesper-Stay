@@ -60,7 +60,7 @@ describe('countNights', () => {
 });
 
 describe('computeFolio — room charge', () => {
-  it('uses the derived charge (booking total − POS) when positive', () => {
+  it('uses the captured room total as the room charge', () => {
     const folio = computeFolio(makeInput({ bookingTotalAmount: 300 }));
     expect(folio.nights).toBe(3);
     expect(folio.roomCharge).toBe(300);
@@ -77,7 +77,7 @@ describe('computeFolio — room charge', () => {
     expect(folio.grandTotal).toBe(300);
   });
 
-  it('falls back to catalog when derived charge is exactly zero', () => {
+  it('keeps the room charge independent of POS — POS is never netted against it', () => {
     const folio = computeFolio(
       makeInput({
         bookingTotalAmount: 50,
@@ -86,8 +86,10 @@ describe('computeFolio — room charge', () => {
         orders: [{ id: 'o1', totalAmount: 50, itemNames: ['Mojito'] }],
       }),
     );
-    // derived = 50 − 50 = 0 (not > 0) → catalog 1 × 80
-    expect(folio.roomCharge).toBe(80);
+    // Room stays the captured 50; the 50 Mojito is billed on top, not subtracted.
+    expect(folio.roomCharge).toBe(50);
+    expect(folio.orderTotal).toBe(50);
+    expect(folio.grandTotal).toBe(100);
   });
 
   it('handles fractional nightly rates without drift', () => {
@@ -192,25 +194,21 @@ describe('computeFolio — label pluralisation', () => {
 });
 
 /**
- * KNOWN MODELING ASSUMPTION (flagged for product review, NOT a passing spec of
- * desired behaviour): the room charge is derived as (bookingTotalAmount − POS).
- * If `bookingTotalAmount` is the ROOM price only and POS orders are added later
- * during the stay, the derivation subtracts POS from the room and the guest is
- * effectively undercharged for those extras. This test documents what the code
- * does TODAY so a future fix is a deliberate, visible change.
+ * Room and POS are two independent bills (model "A"). POS added during the stay
+ * is charged ON TOP of the full room price — never subtracted from it.
  */
-describe('computeFolio — documented quirk: POS subtracted from booking total', () => {
-  it('derives room = total − POS, so POS added post-booking can shrink the room charge', () => {
+describe('computeFolio — room and POS billed independently', () => {
+  it('adds post-booking room service on top of the full room price', () => {
     const folio = computeFolio(
       makeInput({
-        bookingTotalAmount: 300, // captured as room-only at booking time
-        baseRate: 100, // catalog also 3 × 100 = 300
+        bookingTotalAmount: 300, // room-only, captured at booking time
+        baseRate: 100,
         orders: [{ id: 'o1', totalAmount: 50, itemNames: ['Room service'] }],
       }),
     );
-    // derived = 300 − 50 = 250 → room shown as 250, grand = 250 + 50 = 300.
-    // The 50 of room service is NOT added on top of the full 300 room price.
-    expect(folio.roomCharge).toBe(250);
-    expect(folio.grandTotal).toBe(300);
+    // Room stays 300; the 50 room service is added on top → 350.
+    expect(folio.roomCharge).toBe(300);
+    expect(folio.orderTotal).toBe(50);
+    expect(folio.grandTotal).toBe(350);
   });
 });

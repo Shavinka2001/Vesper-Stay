@@ -78,10 +78,10 @@ export function countNights(
 /**
  * Build the itemized folio totals.
  *
- * Room charge rule: prefer the "derived" charge (booking total minus POS
- * orders) when it is positive, otherwise fall back to the catalog charge
- * (nights × base rate). This lets a negotiated booking total win over the rack
- * rate while still producing a sane number when no total was captured.
+ * Room and POS are billed as independent folio lines — POS is never netted
+ * against the room. The room charge is the room total captured on the booking
+ * (`bookingTotalAmount`); when none was captured it falls back to the catalog
+ * charge (nights × base rate). POS orders are then added on top.
  */
 export function computeFolio(input: FolioComputationInput): ComputedFolio {
   const nights = countNights(input.checkInDate, input.checkOutDate);
@@ -92,9 +92,10 @@ export function computeFolio(input: FolioComputationInput): ComputedFolio {
   );
 
   const catalogRoomCharge = round2(nights * baseRate);
-  const derivedRoomCharge = round2(input.bookingTotalAmount - orderTotal);
   const roomCharge =
-    derivedRoomCharge > 0 ? derivedRoomCharge : catalogRoomCharge;
+    input.bookingTotalAmount > 0
+      ? round2(input.bookingTotalAmount)
+      : catalogRoomCharge;
 
   const lines: FolioLine[] = [
     {
