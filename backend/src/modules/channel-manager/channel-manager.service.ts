@@ -192,6 +192,44 @@ export class ChannelManagerService {
 
   // ─── Import: pull an external OTA calendar and block those dates ────────────
 
+  /**
+   * Sync every enabled, import-configured connection across all tenants.
+   * Called by the scheduler. Errors are isolated per connection so one bad
+   * feed never stops the rest; each failure is already recorded on its own
+   * connection + sync log by syncConnection().
+   */
+  async syncAllEnabled(): Promise<{ total: number; ok: number; failed: number }> {
+    const connections = await this.prisma.channelConnection.findMany({
+      where: {
+        isEnabled: true,
+        roomId: { not: null },
+        iCalImportUrl: { not: null },
+      },
+      select: { id: true, propertyId: true, name: true },
+    });
+
+    let ok = 0;
+    let failed = 0;
+    for (const c of connections) {
+      try {
+        await this.syncConnection(c.propertyId, c.id);
+        ok += 1;
+      } catch (error) {
+        failed += 1;
+        const message =
+          error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(`Auto-sync failed for "${c.name}": ${message}`);
+      }
+    }
+
+    if (connections.length > 0) {
+      this.logger.log(
+        `Auto-sync: ${ok}/${connections.length} ok, ${failed} failed`,
+      );
+    }
+    return { total: connections.length, ok, failed };
+  }
+
   async syncConnection(
     propertyId: string,
     connectionId: string,

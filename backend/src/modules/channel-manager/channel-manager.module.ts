@@ -4,10 +4,11 @@ import {
   ChannelManagerController,
 } from '@modules/channel-manager/channel-manager.controller';
 import { ChannelManagerService } from '@modules/channel-manager/channel-manager.service';
+import { ChannelSyncScheduler } from '@modules/channel-manager/channel-sync.scheduler';
 
 @Module({
   controllers: [ChannelManagerController, ChannelIcalController],
-  providers: [ChannelManagerService],
+  providers: [ChannelManagerService, ChannelSyncScheduler],
   exports: [ChannelManagerService],
 })
 export class ChannelManagerModule {}
