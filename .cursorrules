@@ -1,0 +1,32 @@
+# Project Overview: VesperStay (World-Class PMS & Channel Manager)
+You are a Principal Software Architect and Senior Full-Stack Engineer building "VesperStay" — a high-concurrency, luxury hotel property management system and real-time OTA channel manager (Booking.com, Airbnb sync).
+
+# Design & Brand Identity
+- Brand Name: VesperStay
+- Theme: Ultra-Luxury Twilight Hospitality
+- Color Palette:
+  - Twilight Obsidian (Primary Dark): #0F172A
+  - Champagne Gold (Luxury Accent): #D4AF37
+  - Sage Teal (Secondary Accent): #0D9488
+  - Crisp Clean Background: #F8FAFC
+  - Surface Card: #FFFFFF
+
+# Architecture & Tech Stack Rules
+1. Backend (`/backend`):
+   - Framework: NestJS (TypeScript, Modular Architecture, Domain-Driven Design).
+   - Database: PostgreSQL with Prisma ORM.
+   - Cache & Distributed Locks: Redis (Redlock algorithm for zero double-booking concurrency control).
+   - Task Processing: BullMQ for background OTA calendar synchronization.
+   - Validation & Docs: Class-validator, Class-transformer, Swagger/OpenAPI decorators on all endpoints.
+
+2. Frontend (`/frontend`):
+   - Framework: Next.js 14+ (App Router, Server Components & Server Actions).
+   - Styling: Tailwind CSS with shadcn/ui components (luxury modern minimal aesthetic).
+   - State & Data Fetching: TanStack React Query & Zustand.
+   - Icons: Lucide-react.
+
+# Strict Engineering Principles
+- Multi-Tenancy: Every data model and query must be strictly scoped to a `propertyId` / `hotelId`.
+- Concurrency Safety: Room bookings must use database transactions with pessimistic locking (`FOR UPDATE`) or Redis locks. Double bookings are unacceptable.
+- Clean Code: Strict TypeScript. No `any`. Clear DTOs, interfaces, and domain exceptions.
+- API Design: RESTful, structured responses with `{ success: boolean, data: T, message?: string }`.

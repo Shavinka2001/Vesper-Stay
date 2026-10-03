@@ -1,0 +1,617 @@
+// VesperStay — Enterprise PostgreSQL schema
+// Multi-tenant PMS & real-time OTA channel manager.
+//
+// Concurrency / double-booking safety (two layers):
+//   1. Application layer: a transactional SELECT overlap check in
+//      BookingsService.persistNewBooking for fast, friendly rejection.
+//   2. Database layer (source of truth): the `bookings_no_overlap` GiST
+//      EXCLUDE constraint prevents any two active bookings from overlapping on
+//      the same room, atomically, even under full concurrency. Because Prisma
+//      cannot express EXCLUDE constraints, it lives in a raw SQL script applied
+//      out-of-band: prisma/sql/001_booking_no_overlap_exclusion.sql
+//      (run `npm run db:constraints`). Keep it in sync if you change the
+//      Booking date columns or the active-status set.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  HOTEL_OWNER
+  MANAGER
+  FRONT_DESK
+  HOUSEKEEPING
+}
+
+enum RoomStatus {
+  AVAILABLE
+  DIRTY
+  OCCUPIED
+  MAINTENANCE
+  OUT_OF_ORDER
+  /// @deprecated Prefer DIRTY for housekeeping dirty rooms.
+  CLEANING
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  DIRECT_WEB
+  FRONT_DESK
+  AIRBNB
+  BOOKING_COM
+  EXPEDIA
+  PHONE
+  OTHER
+  /// @deprecated Prefer DIRECT_WEB.
+  DIRECT
+  /// @deprecated Prefer FRONT_DESK.
+  WALK_IN
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  ONLINE
+  OTA_COLLECT
+  CHARGE_TO_ROOM
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+  CANCELLED
+}
+
+enum ChannelType {
+  BOOKING_COM
+  AIRBNB
+  EXPEDIA
+  ICAL
+  OTHER
+}
+
+enum ChannelSyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  FAILED
+}
+
+enum ChannelSyncDirection {
+  IMPORT
+  EXPORT
+  BIDIRECTIONAL
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderType {
+  RESTAURANT
+  CABANA
+  ROOM_SERVICE
+  POOL_BAR
+}
+
+enum ExpenseCategory {
+  PAYROLL
+  UTILITIES
+  MAINTENANCE
+  SUPPLIES
+  FOOD_BEVERAGE
+  MARKETING
+  TAXES
+  INSURANCE
+  OTHER
+}
+
+enum InventoryUnit {
+  UNIT
+  KG
+  LITER
+  BOX
+  PACK
+  BOTTLE
+  OTHER
+}
+
+// ─── Multi-Tenancy & RBAC ────────────────────────────────────────────────────
+
+model Property {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  legalName    String?
+  timezone     String   @default("UTC")
+  currency     String   @default("USD")
+  email        String?
+  phone        String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  country      String?
+  postalCode   String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships        PropertyMembership[]
+  roomTypes          RoomType[]
+  rooms              Room[]
+  ratePlans          RatePlan[]
+  guests             Guest[]
+  bookings           Booking[]
+  payments           Payment[]
+  channelConnections ChannelConnection[]
+  inventoryCalendars InventoryCalendar[]
+  menuItems          MenuItem[]
+  orders             Order[]
+  inventoryItems     InventoryItem[]
+  expenses           Expense[]
+
+  @@index([isActive])
+  @@index([country])
+  @@map("properties")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  /// Global platform role; property-scoped roles live on PropertyMembership.
+  globalRole   UserRole?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  memberships PropertyMembership[]
+  expenses    Expense[]            @relation("ExpenseRecordedBy")
+
+  @@index([isActive])
+  @@index([globalRole])
+  @@map("users")
+}
+
+model PropertyMembership {
+  id         String   @id @default(uuid())
+  propertyId String
+  userId     String
+  role       UserRole
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, userId])
+  @@index([userId])
+  @@index([propertyId, role])
+  @@map("property_memberships")
+}
+
+// ─── Inventory & Rooms ───────────────────────────────────────────────────────
+
+model RoomType {
+  id           String   @id @default(uuid())
+  propertyId   String
+  name         String
+  code         String
+  description  String?
+  maxOccupancy Int
+  baseRate     Decimal  @db.Decimal(12, 2)
+  amenities    String[] @default([])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property  Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rooms     Room[]
+  ratePlans RatePlan[]
+  inventory InventoryCalendar[]
+
+  @@unique([propertyId, code])
+  @@index([propertyId])
+  @@index([propertyId, isActive])
+  @@map("room_types")
+}
+
+model Room {
+  id         String     @id @default(uuid())
+  propertyId String
+  roomTypeId String
+  number     String
+  floor      String?
+  status     RoomStatus @default(AVAILABLE)
+  notes      String?
+  isCabana   Boolean    @default(false)
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomType RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+  orders   Order[]
+
+  @@unique([propertyId, number])
+  @@index([propertyId, status])
+  @@index([roomTypeId])
+  @@index([propertyId, isCabana])
+  @@map("rooms")
+}
+
+model RatePlan {
+  id               String   @id @default(uuid())
+  propertyId       String
+  roomTypeId       String
+  name             String
+  code             String
+  description      String?
+  currency         String   @default("USD")
+  basePrice        Decimal  @db.Decimal(12, 2)
+  minStayNights    Int      @default(1)
+  maxStayNights    Int?
+  breakfastIncluded Boolean @default(false)
+  isRefundable     Boolean  @default(true)
+  cancellationHours Int?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomType RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  @@unique([propertyId, code])
+  @@index([propertyId])
+  @@index([roomTypeId])
+  @@index([propertyId, isActive])
+  @@map("rate_plans")
+}
+
+/// Per-date allotment & rate grid used by the channel manager.
+model InventoryCalendar {
+  id                String   @id @default(uuid())
+  propertyId        String
+  roomTypeId        String
+  date              DateTime @db.Date
+  allotment         Int
+  bookedCount       Int      @default(0)
+  rate              Decimal? @db.Decimal(12, 2)
+  closedToArrival   Boolean  @default(false)
+  closedToDeparture Boolean  @default(false)
+  stopSell          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([roomTypeId, date])
+  @@index([propertyId, date])
+  @@map("inventory_calendars")
+}
+
+// ─── Guests CRM ──────────────────────────────────────────────────────────────
+
+model Guest {
+  id            String   @id @default(uuid())
+  propertyId    String
+  email         String?
+  firstName     String
+  lastName      String
+  /// E.164 WhatsApp / mobile number (e.g. +94771234567).
+  phone         String?
+  idPassport    String?
+  country       String?
+  nationality   String?
+  vehicleNumber String?
+  isBlacklisted Boolean  @default(false)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  orders   Order[]
+
+  @@index([propertyId, email])
+  @@index([propertyId, lastName, firstName])
+  @@index([propertyId, idPassport])
+  @@index([propertyId, phone])
+  @@index([propertyId, isBlacklisted])
+  @@index([propertyId, country])
+  @@map("guests")
+}
+
+// ─── High-Concurrency Bookings ───────────────────────────────────────────────
+
+model Booking {
+  id               String        @id @default(uuid())
+  propertyId       String
+  roomId           String
+  guestId          String
+  ratePlanId       String?
+  confirmationCode String
+  status           BookingStatus @default(PENDING)
+  source           BookingSource @default(DIRECT_WEB)
+  externalRef      String?
+  checkInDate      DateTime      @db.Date
+  checkOutDate     DateTime      @db.Date
+  adults           Int           @default(1)
+  children         Int           @default(0)
+  currency         String        @default("USD")
+  totalAmount      Decimal       @db.Decimal(12, 2)
+  paidAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  notes            String?
+  /// Optimistic locking counter — increment on every concurrent-safe update.
+  version          Int           @default(1)
+  cancelledAt      DateTime?
+  checkedInAt      DateTime?
+  checkedOutAt     DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  guest    Guest     @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  ratePlan RatePlan? @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
+  payments Payment[]
+  orders   Order[]
+
+  @@unique([propertyId, confirmationCode])
+  @@index([propertyId, status])
+  @@index([propertyId, source])
+  @@index([propertyId, roomId, checkInDate, checkOutDate])
+  @@index([propertyId, checkInDate, checkOutDate])
+  @@index([propertyId, checkInDate])
+  @@index([propertyId, checkOutDate])
+  @@index([guestId])
+  @@index([roomId, status])
+  @@index([externalRef])
+  @@map("bookings")
+}
+
+// ─── Folio & Payments ────────────────────────────────────────────────────────
+
+model Payment {
+  id            String        @id @default(uuid())
+  propertyId    String
+  bookingId     String
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("USD")
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  notes         String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId])
+  @@index([bookingId])
+  @@index([propertyId, status])
+  @@index([propertyId, method])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+// ─── Channel Manager Engine ──────────────────────────────────────────────────
+
+model ChannelConnection {
+  id                   String            @id @default(uuid())
+  propertyId           String
+  channelType          ChannelType
+  name                 String
+  isEnabled            Boolean           @default(false)
+  hotelCode            String?
+  /// Application-layer encrypted OTA credentials (never store plaintext).
+  credentialsEncrypted String?
+  /// iCal feed URL to pull external calendars (Airbnb, etc.).
+  iCalImportUrl        String?
+  /// Public iCal feed URL we expose for external OTAs to consume.
+  iCalExportUrl        String?
+  syncDirection        ChannelSyncDirection @default(BIDIRECTIONAL)
+  lastSyncedAt         DateTime?
+  lastSyncStatus       ChannelSyncStatus @default(IDLE)
+  lastSyncError        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  property Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  syncLogs ChannelSyncLog[]
+
+  @@unique([propertyId, channelType, name])
+  @@index([propertyId])
+  @@index([propertyId, isEnabled])
+  @@index([propertyId, channelType])
+  @@map("channel_connections")
+}
+
+model ChannelSyncLog {
+  id                  String              @id @default(uuid())
+  channelConnectionId String
+  direction           ChannelSyncDirection
+  status              ChannelSyncStatus
+  startedAt           DateTime            @default(now())
+  finishedAt          DateTime?
+  recordsProcessed    Int                 @default(0)
+  recordsFailed       Int                 @default(0)
+  errorMessage        String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+
+  channelConnection ChannelConnection @relation(fields: [channelConnectionId], references: [id], onDelete: Cascade)
+
+  @@index([channelConnectionId, startedAt])
+  @@index([channelConnectionId, status])
+  @@map("channel_sync_logs")
+}
+
+// ─── Restaurant / Cabana POS ─────────────────────────────────────────────────
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  propertyId  String
+  name        String
+  category    String
+  description String?
+  price       Decimal  @db.Decimal(12, 2)
+  currency    String   @default("USD")
+  isAvailable Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([propertyId])
+  @@index([propertyId, category])
+  @@index([propertyId, isAvailable])
+  @@map("menu_items")
+}
+
+model Order {
+  id            String         @id @default(uuid())
+  propertyId    String
+  bookingId     String?
+  roomId        String?
+  guestId       String?
+  orderType     OrderType      @default(RESTAURANT)
+  status        OrderStatus    @default(PENDING)
+  paymentMethod PaymentMethod?
+  currency      String         @default("USD")
+  subtotal      Decimal        @db.Decimal(12, 2)
+  taxAmount     Decimal        @default(0) @db.Decimal(12, 2)
+  totalAmount   Decimal        @db.Decimal(12, 2)
+  notes         String?
+  orderedAt     DateTime       @default(now())
+  deliveredAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  booking    Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  room       Room?       @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  guest      Guest?      @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  orderItems OrderItem[]
+
+  @@index([propertyId])
+  @@index([propertyId, status])
+  @@index([propertyId, orderType])
+  @@index([propertyId, paymentMethod])
+  @@index([bookingId])
+  @@index([roomId])
+  @@index([guestId])
+  @@index([propertyId, orderedAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String
+  menuItemId String
+  quantity   Int     @default(1)
+  unitPrice  Decimal @db.Decimal(12, 2)
+  lineTotal  Decimal @db.Decimal(12, 2)
+  notes      String?
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("order_items")
+}
+
+// ─── Inventory Management (F&B / Supplies) ───────────────────────────────────
+
+model InventoryItem {
+  id                 String        @id @default(uuid())
+  propertyId         String
+  name               String
+  sku                String?
+  category           String?
+  unit               InventoryUnit @default(UNIT)
+  quantityOnHand     Decimal       @default(0) @db.Decimal(12, 3)
+  reorderLevel       Decimal       @default(0) @db.Decimal(12, 3)
+  /// Quantity at or below which a low-stock alert should fire.
+  lowStockAlertQty   Decimal       @default(0) @db.Decimal(12, 3)
+  unitCost           Decimal?      @db.Decimal(12, 2)
+  isActive           Boolean       @default(true)
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, sku])
+  @@index([propertyId])
+  @@index([propertyId, category])
+  @@index([propertyId, isActive])
+  @@map("inventory_items")
+}
+
+// ─── Cashflow & Expenses ─────────────────────────────────────────────────────
+
+model Expense {
+  id           String          @id @default(uuid())
+  propertyId   String
+  recordedById String?
+  category     ExpenseCategory
+  title        String
+  description  String?
+  amount       Decimal         @db.Decimal(12, 2)
+  currency     String          @default("USD")
+  expenseDate  DateTime        @db.Date
+  receiptUrl   String?
+  vendor       String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  recordedBy User?    @relation("ExpenseRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([propertyId])
+  @@index([propertyId, category])
+  @@index([propertyId, expenseDate])
+  @@index([recordedById])
+  @@map("expenses")
+}
