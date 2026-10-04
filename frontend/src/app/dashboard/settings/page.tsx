@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { AddRoomModal } from '@/components/rooms/AddRoomModal';
 import { AddRoomTypeModal } from '@/components/rooms/AddRoomTypeModal';
+import { WhatsAppSettingsCard } from '@/components/settings/WhatsAppSettingsCard';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { currencySymbol } from '@/components/dashboard/nav-config';
 import {
@@ -384,6 +385,8 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        <WhatsAppSettingsCard />
       </div>
 
       <AddRoomTypeModal

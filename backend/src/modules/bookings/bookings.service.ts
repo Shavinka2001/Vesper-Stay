@@ -158,6 +158,7 @@ export class BookingsService {
       let whatsapp = null;
       if (instantCheckIn) {
         whatsapp = await this.whatsApp.sendWelcomeMessage({
+          propertyId,
           guestFirstName: booking.guest.firstName,
           guestPhone: booking.guest.phone,
           propertyName: property.name,
@@ -525,6 +526,7 @@ export class BookingsService {
     });
 
     const whatsapp = await this.whatsApp.sendWelcomeMessage({
+      propertyId,
       guestFirstName: updated.guest.firstName,
       guestPhone: updated.guest.phone,
       propertyName: updated.property.name,
@@ -625,6 +627,7 @@ export class BookingsService {
 
     const settledFolio = this.buildFolio(updated);
     const whatsapp = await this.whatsApp.sendInvoiceMessage({
+      propertyId,
       guestFirstName: updated.guest.firstName,
       guestPhone: updated.guest.phone,
       propertyName: updated.property.name,

@@ -519,3 +519,18 @@ export type ChannelSyncResult = {
   failed: number;
   errors: string[];
 };
+
+// ─── WhatsApp (Meta Cloud API) config ────────────────────────────────────────
+
+export type WhatsAppConfig = {
+  enabled: boolean;
+  phoneNumberId: string | null;
+  hasToken: boolean;
+  encryptionAvailable: boolean;
+};
+
+export type UpdateWhatsAppConfigPayload = {
+  enabled?: boolean;
+  phoneNumberId?: string;
+  accessToken?: string;
+};

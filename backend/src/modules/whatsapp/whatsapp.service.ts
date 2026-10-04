@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { SecretCipherService } from '@common/crypto/secret-cipher.service';
+import { PrismaService } from '@prisma/prisma.service';
 
 export type WhatsAppDispatchResult = {
   message: string;
   waMeUrl: string | null;
   dispatched: boolean;
-  channel: 'twilio' | 'meta' | 'wa_me' | 'none';
+  channel: 'meta' | 'wa_me' | 'none';
+  error?: string;
 };
 
 type WelcomeContext = {
+  propertyId: string;
   guestFirstName: string;
   guestPhone: string | null;
   propertyName: string;
@@ -25,6 +28,7 @@ type InvoiceLine = {
 };
 
 type InvoiceContext = {
+  propertyId: string;
   guestFirstName: string;
   guestPhone: string | null;
   propertyName: string;
@@ -38,11 +42,17 @@ type InvoiceContext = {
   reviewUrl?: string;
 };
 
+const GRAPH_API_VERSION = 'v21.0';
+const SEND_TIMEOUT_MS = 8_000;
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cipher: SecretCipherService,
+  ) {}
 
   buildWelcomeMessage(ctx: WelcomeContext): string {
     const wifiName = ctx.wifiName ?? 'VesperStay-Guest';
@@ -69,9 +79,7 @@ export class WhatsAppService {
   }
 
   buildInvoiceMessage(ctx: InvoiceContext): string {
-    const reviewUrl =
-      ctx.reviewUrl ??
-      'https://g.page/r/vesperstay-review';
+    const reviewUrl = ctx.reviewUrl ?? 'https://g.page/r/vesperstay-review';
     const symbol = this.currencySymbol(ctx.currency);
     const lines = ctx.lines
       .map((line) => `• ${line.label}: ${symbol}${line.amount.toFixed(2)}`)
@@ -100,59 +108,77 @@ export class WhatsAppService {
   async sendWelcomeMessage(
     ctx: WelcomeContext,
   ): Promise<WhatsAppDispatchResult> {
-    const message = this.buildWelcomeMessage(ctx);
-    return this.dispatch(ctx.guestPhone, message);
+    return this.dispatch(ctx.propertyId, ctx.guestPhone, this.buildWelcomeMessage(ctx));
   }
 
   async sendInvoiceMessage(
     ctx: InvoiceContext,
   ): Promise<WhatsAppDispatchResult> {
-    const message = this.buildInvoiceMessage(ctx);
-    return this.dispatch(ctx.guestPhone, message);
+    return this.dispatch(ctx.propertyId, ctx.guestPhone, this.buildInvoiceMessage(ctx));
   }
 
-  buildWaMeUrl(phone: string | null | undefined, message: string): string | null {
+  buildWaMeUrl(
+    phone: string | null | undefined,
+    message: string,
+  ): string | null {
     const digits = this.normalizePhone(phone);
     if (!digits) return null;
     return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
   }
 
+  /**
+   * Send via the property's WhatsApp Cloud API credentials when configured and
+   * enabled; otherwise return a click-to-chat wa.me link (zero-cost fallback).
+   * Never throws — a failed send must not break check-in/out.
+   */
   private async dispatch(
+    propertyId: string,
     phone: string | null | undefined,
     message: string,
   ): Promise<WhatsAppDispatchResult> {
     const waMeUrl = this.buildWaMeUrl(phone, message);
-    const twilioSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
-    const twilioToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-    const twilioFrom = this.configService.get<string>('TWILIO_WHATSAPP_FROM');
-    const metaToken = this.configService.get<string>('META_WHATSAPP_TOKEN');
-    const metaPhoneId = this.configService.get<string>(
-      'META_WHATSAPP_PHONE_ID',
-    );
+    const to = this.normalizePhone(phone);
 
-    if (twilioSid && twilioToken && twilioFrom && phone) {
-      this.logger.log(
-        `Twilio WhatsApp credentials detected — stub dispatch to ${phone}`,
-      );
-      // Direct API wiring can be enabled when credentials are production-ready.
-      return {
-        message,
-        waMeUrl,
-        dispatched: false,
-        channel: 'twilio',
-      };
-    }
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      select: {
+        whatsappEnabled: true,
+        whatsappPhoneNumberId: true,
+        whatsappTokenEncrypted: true,
+      },
+    });
 
-    if (metaToken && metaPhoneId && phone) {
-      this.logger.log(
-        `Meta WhatsApp credentials detected — stub dispatch to ${phone}`,
-      );
-      return {
-        message,
-        waMeUrl,
-        dispatched: false,
-        channel: 'meta',
-      };
+    const canSend =
+      !!property?.whatsappEnabled &&
+      !!property.whatsappPhoneNumberId &&
+      !!property.whatsappTokenEncrypted &&
+      this.cipher.isAvailable &&
+      !!to;
+
+    if (canSend) {
+      try {
+        const token = this.cipher.decrypt(property.whatsappTokenEncrypted!);
+        await this.sendViaMeta(
+          property.whatsappPhoneNumberId!,
+          token,
+          to!,
+          message,
+        );
+        return { message, waMeUrl, dispatched: true, channel: 'meta' };
+      } catch (error) {
+        const errMsg =
+          error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `WhatsApp Cloud API send failed (${propertyId}): ${errMsg} — falling back to wa.me`,
+        );
+        return {
+          message,
+          waMeUrl,
+          dispatched: false,
+          channel: waMeUrl ? 'wa_me' : 'none',
+          error: errMsg,
+        };
+      }
     }
 
     return {
@@ -161,6 +187,44 @@ export class WhatsAppService {
       dispatched: false,
       channel: waMeUrl ? 'wa_me' : 'none',
     };
+  }
+
+  /** POST a text message to the WhatsApp Cloud API. Throws on non-2xx. */
+  private async sendViaMeta(
+    phoneNumberId: string,
+    accessToken: string,
+    to: string,
+    body: string,
+  ): Promise<void> {
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to,
+          type: 'text',
+          // NOTE: free-form text only reaches users who messaged us in the last
+          // 24h (or the dev test number's verified recipients). Production
+          // proactive sends require a pre-approved message template.
+          text: { preview_url: false, body },
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`Graph API ${response.status}: ${detail.slice(0, 300)}`);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private normalizePhone(phone: string | null | undefined): string | null {

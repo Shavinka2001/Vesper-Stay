@@ -160,6 +160,13 @@ model Property {
   country      String?
   postalCode   String?
   isActive     Boolean  @default(true)
+
+  // WhatsApp Cloud API (per-tenant). Token is encrypted at rest (AES-256-GCM);
+  // never stored or returned in plaintext.
+  whatsappEnabled        Boolean @default(false)
+  whatsappPhoneNumberId  String?
+  whatsappTokenEncrypted String?
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

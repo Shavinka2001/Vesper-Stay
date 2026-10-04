@@ -39,6 +39,8 @@ import type {
   ChannelSyncResult,
   CreateChannelConnectionPayload,
   UpdateChannelConnectionPayload,
+  WhatsAppConfig,
+  UpdateWhatsAppConfigPayload,
 } from '@/lib/types';
 
 const API_BASE_URL =
@@ -493,6 +495,25 @@ export async function syncChannelConnectionRequest(
   const { data } = await api.post<ApiSuccessEnvelope<ChannelSyncResult>>(
     `/channel-manager/connections/${id}/sync`,
     {},
+  );
+  return data.data;
+}
+
+// ─── WhatsApp config ─────────────────────────────────────────────────────────
+
+export async function fetchWhatsAppConfig(): Promise<WhatsAppConfig> {
+  const { data } = await api.get<ApiSuccessEnvelope<WhatsAppConfig>>(
+    '/properties/whatsapp',
+  );
+  return data.data;
+}
+
+export async function updateWhatsAppConfigRequest(
+  payload: UpdateWhatsAppConfigPayload,
+): Promise<WhatsAppConfig> {
+  const { data } = await api.patch<ApiSuccessEnvelope<WhatsAppConfig>>(
+    '/properties/whatsapp',
+    payload,
   );
   return data.data;
 }

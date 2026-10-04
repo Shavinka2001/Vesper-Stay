@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CryptoModule } from '@common/crypto/crypto.module';
 import { AllExceptionsFilter } from '@common/filters/all-exceptions.filter';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@common/interceptors/logging.interceptor';
@@ -29,6 +30,7 @@ import { AppService } from './app.service';
       validate: validateEnv,
     }),
     ScheduleModule.forRoot(),
+    CryptoModule,
     PrismaModule,
     AuthModule,
     PropertiesModule,
