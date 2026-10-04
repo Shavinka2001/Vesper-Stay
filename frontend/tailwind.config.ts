@@ -10,6 +10,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Semantic tokens — resolve to CSS variables so one class works in both
+        // themes (bg-surface, border-line, text-ink, text-muted, text-gold-ink…).
+        bg: 'rgb(var(--bg) / <alpha-value>)',
+        surface: 'rgb(var(--surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--surface-2) / <alpha-value>)',
+        'surface-3': 'rgb(var(--surface-3) / <alpha-value>)',
+        line: 'rgb(var(--line) / <alpha-value>)',
+        ink: 'rgb(var(--ink) / <alpha-value>)',
+        muted: 'rgb(var(--muted) / <alpha-value>)',
+        gold: 'rgb(var(--gold) / <alpha-value>)',
+        'gold-ink': 'rgb(var(--gold-ink) / <alpha-value>)',
         brand: {
           obsidian: '#0F172A',
           twilight: '#0B0F17',

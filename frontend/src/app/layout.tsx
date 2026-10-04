@@ -38,7 +38,7 @@ export default function RootLayout({
       className={`${display.variable} ${sans.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-dvh bg-slate-50 text-slate-900 antialiased dark:bg-[#0B0F17] dark:text-slate-100">
+      <body className="min-h-dvh bg-bg text-ink antialiased">
         <ThemeProvider>
           {children}
           <ToasterProvider />

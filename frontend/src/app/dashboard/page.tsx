@@ -23,6 +23,7 @@ import {
   fetchTimelineBookings,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { FadeIn } from '@/components/ui/motion';
 import type {
   DashboardMetrics,
   RoomStatusCount,
@@ -149,37 +150,38 @@ export default function DashboardOverviewPage() {
   const propertyName = property?.name ?? 'your property';
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <FadeIn className="mx-auto max-w-7xl space-y-6">
       {/* Welcome */}
-      <section className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-5 py-6 sm:px-7 sm:py-7 dark:border-slate-800 dark:bg-[#111726]">
+      <section className="vesper-card relative overflow-hidden px-5 py-6 sm:px-7 sm:py-8">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_80%_at_0%_0%,rgba(212,175,55,0.12),transparent_55%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_90%_at_0%_0%,rgba(212,175,55,0.14),transparent_55%)]"
         />
         <div className="relative">
-          <p className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B89428] dark:text-[#D4AF37]">
+          <p className="eyebrow mb-2 inline-flex items-center gap-1.5">
             <Sparkles className="h-3.5 w-3.5" />
             Live pulse
           </p>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">
-            {greeting}, {firstName} — Here is the pulse for {propertyName}
+          <h2 className="display text-2xl font-semibold text-ink sm:text-[28px]">
+            {greeting}, {firstName}
           </h2>
-          <p className="mt-1.5 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Arrivals, departures, occupancy, and revenue for today&apos;s
-            front-desk operations.
+          <p className="mt-1.5 max-w-2xl text-sm text-muted">
+            Here&apos;s the pulse for{' '}
+            <span className="font-medium text-ink">{propertyName}</span> —
+            arrivals, departures, occupancy, and revenue for today.
           </p>
         </div>
       </section>
 
       {/* Metrics */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111726]">
+        <article className="vesper-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Occupancy rate
               </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+              <p className="mt-2 display text-[28px] font-semibold text-ink tnum">
                 {loading ? '—' : `${metrics.occupancyRate}%`}
               </p>
               <p className="mt-1 text-xs text-slate-500">
@@ -191,40 +193,40 @@ export default function DashboardOverviewPage() {
           </div>
         </article>
 
-        <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111726]">
+        <article className="vesper-card p-5">
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">
             <LogIn className="h-5 w-5" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Today&apos;s arrivals
           </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <p className="mt-2 display text-[28px] font-semibold text-ink tnum">
             {loading ? '—' : metrics.todaysArrivals}
           </p>
           <p className="mt-1 text-xs text-slate-500">Check-ins pending</p>
         </article>
 
-        <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111726]">
+        <article className="vesper-card p-5">
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
             <LogOut className="h-5 w-5" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Today&apos;s departures
           </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <p className="mt-2 display text-[28px] font-semibold text-ink tnum">
             {loading ? '—' : metrics.todaysDepartures}
           </p>
           <p className="mt-1 text-xs text-slate-500">Check-outs pending</p>
         </article>
 
-        <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111726]">
+        <article className="vesper-card p-5">
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#D4AF37]/15 text-[#8A7020] dark:text-[#D4AF37]">
             <CircleDollarSign className="h-5 w-5" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Today&apos;s gross revenue
           </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <p className="mt-2 display text-[28px] font-semibold text-ink tnum">
             {loading ? '—' : formatMoney(metrics.todaysRevenue, currency)}
           </p>
           <p className="mt-1 text-xs text-slate-500">{currency} captured today</p>
@@ -235,7 +237,7 @@ export default function DashboardOverviewPage() {
       <section className="grid gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
           {/* Quick actions */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-[#111726]">
+          <div className="vesper-card p-5 sm:p-6">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
               Quick actions
             </h3>
@@ -283,7 +285,7 @@ export default function DashboardOverviewPage() {
           </div>
 
           {/* Room status */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-[#111726]">
+          <div className="vesper-card p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -341,7 +343,7 @@ export default function DashboardOverviewPage() {
 
         {/* Recent activity */}
         <div className="lg:col-span-4">
-          <div className="h-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-[#111726]">
+          <div className="vesper-card h-full p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 Recent activity
@@ -407,6 +409,6 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </section>
-    </div>
+    </FadeIn>
   );
 }

@@ -3,12 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --brand-obsidian: #0f172a;
-  --brand-gold: #d4af37;
-  --brand-gold-hover: #c59b27;
-  --brand-teal: #0d9488;
-  --brand-bg: #f8fafc;
-  --brand-surface: #ffffff;
+  /* Semantic tokens as "R G B" triplets for rgb(var(--x) / <alpha>) */
+  --bg: 248 250 252; /* slate-50 */
+  --surface: 255 255 255;
+  --surface-2: 248 250 252;
+  --surface-3: 241 245 249;
+  --line: 226 232 240; /* slate-200 */
+  --ink: 15 23 42; /* slate-900 */
+  --muted: 100 116 139; /* slate-500 */
+  --gold: 212 175 55; /* champagne */
+  --gold-ink: 138 112 32; /* readable gold on light surfaces */
+}
+
+.dark {
+  --bg: 11 15 23; /* twilight #0B0F17 */
+  --surface: 17 23 38; /* raised #111726 */
+  --surface-2: 14 20 32; /* #0E1420 */
+  --surface-3: 23 31 49; /* overlay */
+  --line: 30 41 59; /* slate-800 */
+  --ink: 241 245 249; /* slate-100 */
+  --muted: 148 163 184; /* slate-400 */
+  --gold: 212 175 55;
+  --gold-ink: 212 175 55; /* gold is legible on dark */
 }
 
 @layer base {
@@ -23,9 +39,38 @@
     font-family: var(--font-sans), system-ui, sans-serif;
   }
 
+  /* Numbers line up in tables/KPIs */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
   ::selection {
     background: rgba(212, 175, 55, 0.28);
     color: #0f172a;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--gold) / 0.7);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* The one luxury surface — layered background, hairline, soft elevation. */
+  .vesper-card {
+    @apply rounded-2xl border border-line bg-surface shadow-soft;
+  }
+
+  /* Elegant serif display for headings & hero numbers. */
+  .display {
+    font-family: var(--font-display), Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Small all-caps eyebrow label. */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-ink;
   }
 }
 
