@@ -15,7 +15,9 @@ import type { CheckInDto } from '@modules/bookings/dto/check-in.dto';
 import type { CheckOutDto } from '@modules/bookings/dto/check-out.dto';
 import type { CreateBookingDto } from '@modules/bookings/dto/create-booking.dto';
 import type { UpdatableBookingStatus } from '@modules/bookings/dto/update-booking-status.dto';
+import { isBookingOverlapConflict } from '@modules/bookings/booking-errors';
 import { computeFolio } from '@modules/bookings/folio';
+import { ChannelManagerService } from '@modules/channel-manager/channel-manager.service';
 import { WhatsAppService } from '@modules/whatsapp/whatsapp.service';
 import { PrismaService } from '@prisma/prisma.service';
 
@@ -25,36 +27,16 @@ const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.CHECKED_IN,
 ];
 
-/**
- * True when an error is the Postgres exclusion-constraint violation raised by
- * the `bookings_no_overlap` constraint (SQLSTATE 23P01). Prisma does not map
- * exclusion violations to a dedicated code, so we match defensively on the
- * SQLSTATE, the meta code, and the constraint name in the message. Pure &
- * side-effect-free so it can be unit-tested without a database.
- */
-export function isBookingOverlapConflict(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-  const err = error as {
-    code?: string;
-    meta?: { code?: string } | null;
-    message?: string;
-  };
-  const message = typeof err.message === 'string' ? err.message : '';
-  return (
-    err.code === '23P01' ||
-    err.meta?.code === '23P01' ||
-    message.includes('23P01') ||
-    message.includes('bookings_no_overlap')
-  );
-}
+// Re-exported for backwards compatibility; the implementation now lives in
+// booking-errors.ts so other modules can use it without importing this service.
+export { isBookingOverlapConflict };
 
 @Injectable()
 export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsApp: WhatsAppService,
+    private readonly channelManager: ChannelManagerService,
   ) {}
 
   async createBooking(propertyId: string, dto: CreateBookingDto) {
@@ -109,6 +91,16 @@ export class BookingsService {
       const now = new Date();
       const adults = Number(dto.adultsCount) || 1;
       const children = Number(dto.childrenCount ?? 0) || 0;
+
+      // Event-driven: pull the freshest OTA calendar for this room before we
+      // accept the booking, so a reservation made on Airbnb minutes ago is
+      // already blocked locally. Resilient by design — never blocks the booking
+      // if a feed is slow or down.
+      try {
+        await this.channelManager.refreshRoomImports(propertyId, dto.roomId);
+      } catch (refreshError) {
+        console.warn('JIT channel refresh failed (continuing):', refreshError);
+      }
 
       let booking;
       try {

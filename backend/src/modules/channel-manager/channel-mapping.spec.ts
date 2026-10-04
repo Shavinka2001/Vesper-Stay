@@ -4,6 +4,7 @@ import {
   channelTypeToBookingSource,
   isOwnFeedEvent,
   OWN_FEED_UID_SUFFIX,
+  shouldSkipSync,
 } from '@modules/channel-manager/channel-mapping';
 
 describe('channelTypeToBookingSource', () => {
@@ -42,5 +43,28 @@ describe('isOwnFeedEvent', () => {
 
   it('treats external OTA uids as importable', () => {
     expect(isOwnFeedEvent('1234567890@airbnb.com')).toBe(false);
+  });
+});
+
+describe('shouldSkipSync', () => {
+  const now = new Date('2026-10-04T10:00:00.000Z');
+  const throttle = 60_000; // 60s
+
+  it('never skips when there is no prior sync', () => {
+    expect(shouldSkipSync(null, now, throttle)).toBe(false);
+  });
+
+  it('skips when the last sync is within the throttle window', () => {
+    const recent = new Date(now.getTime() - 30_000); // 30s ago
+    expect(shouldSkipSync(recent, now, throttle)).toBe(true);
+  });
+
+  it('allows a sync once the throttle window has passed', () => {
+    const old = new Date(now.getTime() - 90_000); // 90s ago
+    expect(shouldSkipSync(old, now, throttle)).toBe(false);
+  });
+
+  it('is safe with an unparseable date', () => {
+    expect(shouldSkipSync('not-a-date', now, throttle)).toBe(false);
   });
 });

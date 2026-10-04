@@ -11,11 +11,12 @@ import {
   ChannelSyncStatus,
   Prisma,
 } from '@generated/prisma/client';
-import { isBookingOverlapConflict } from '@modules/bookings/bookings.service';
+import { isBookingOverlapConflict } from '@modules/bookings/booking-errors';
 import {
   buildExternalRef,
   channelTypeToBookingSource,
   isOwnFeedEvent,
+  shouldSkipSync,
 } from '@modules/channel-manager/channel-mapping';
 import type { CreateChannelConnectionDto } from '@modules/channel-manager/dto/create-channel-connection.dto';
 import type { UpdateChannelConnectionDto } from '@modules/channel-manager/dto/update-channel-connection.dto';
@@ -33,6 +34,11 @@ const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
 ];
 
 const FETCH_TIMEOUT_MS = 15_000;
+
+// Just-in-time refresh (called from the booking path) must be fast and never
+// block revenue: cap each connection at 6s and skip connections synced < 60s ago.
+const JIT_TIMEOUT_MS = 6_000;
+const JIT_THROTTLE_MS = 60_000;
 
 export interface SyncResult {
   connectionId: string;
@@ -228,6 +234,42 @@ export class ChannelManagerService {
       );
     }
     return { total: connections.length, ok, failed };
+  }
+
+  /**
+   * Just-in-time refresh of a room's channel imports, called right before a
+   * front-desk booking is accepted. Deliberately resilient: it is throttled,
+   * time-capped, and NEVER throws — a slow or dead OTA feed must not block a
+   * walk-in. It simply gives the overlap check the freshest OTA data it can.
+   */
+  async refreshRoomImports(propertyId: string, roomId: string): Promise<void> {
+    const connections = await this.prisma.channelConnection.findMany({
+      where: {
+        propertyId,
+        roomId,
+        isEnabled: true,
+        iCalImportUrl: { not: null },
+      },
+      select: { id: true, name: true, lastSyncedAt: true },
+    });
+    if (connections.length === 0) return; // no channels on this room → no cost
+
+    const now = new Date();
+    await Promise.all(
+      connections.map(async (c) => {
+        if (shouldSkipSync(c.lastSyncedAt, now, JIT_THROTTLE_MS)) return;
+        try {
+          await this.withTimeout(
+            this.syncConnection(propertyId, c.id),
+            JIT_TIMEOUT_MS,
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'unknown error';
+          this.logger.warn(`JIT refresh skipped for "${c.name}": ${message}`);
+        }
+      }),
+    );
   }
 
   async syncConnection(
@@ -542,5 +584,20 @@ export class ChannelManagerService {
     return new Date(
       Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
     );
+  }
+
+  /**
+   * Resolve/reject `promise`, but reject after `ms` regardless. The underlying
+   * work keeps running (its own fetch has an AbortController) — we just stop
+   * waiting on it so the caller can move on.
+   */
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() =>
+      clearTimeout(timer),
+    ) as Promise<T>;
   }
 }

@@ -31,3 +31,18 @@ export function buildExternalRef(connectionId: string, uid: string): string {
 export function isOwnFeedEvent(uid: string): boolean {
   return uid.endsWith(OWN_FEED_UID_SUFFIX);
 }
+
+/**
+ * Throttle guard for just-in-time syncs: skip if the connection synced within
+ * `throttleMs`, so a burst of bookings on one room can't hammer the OTA feed.
+ */
+export function shouldSkipSync(
+  lastSyncedAt: Date | string | null,
+  now: Date,
+  throttleMs: number,
+): boolean {
+  if (!lastSyncedAt) return false;
+  const last = new Date(lastSyncedAt).getTime();
+  if (Number.isNaN(last)) return false;
+  return now.getTime() - last < throttleMs;
+}
