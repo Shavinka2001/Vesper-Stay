@@ -57,9 +57,14 @@
 }
 
 @layer components {
-  /* The one luxury surface — layered background, hairline, soft elevation. */
+  /* The one luxury surface — layered background, hairline, soft elevation.
+     Written in raw CSS (not @apply) so it never depends on JIT having the
+     custom color utilities registered at PostCSS time. */
   .vesper-card {
-    @apply rounded-2xl border border-line bg-surface shadow-soft;
+    border-radius: 1rem;
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--surface));
+    box-shadow: 0 18px 50px -24px rgba(15, 23, 42, 0.25);
   }
 
   /* Elegant serif display for headings & hero numbers. */
@@ -70,7 +75,11 @@
 
   /* Small all-caps eyebrow label. */
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-ink;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: rgb(var(--gold-ink));
   }
 }
 
