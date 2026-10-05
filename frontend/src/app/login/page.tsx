@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { SplitAuthLayout } from '@/components/auth/split-auth-layout';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -14,11 +14,11 @@ const DEMO_ADMIN = {
   password: 'Admin@123',
 };
 
-const labelClass =
-  'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300';
-
+const labelClass = 'mb-1.5 block text-xs font-medium text-muted';
 const inputClass =
-  'h-11 w-full rounded-lg border border-slate-300 bg-transparent px-3.5 text-sm text-slate-900 transition-all placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#D4AF37] dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500';
+  'h-11 w-full rounded-xl border border-line bg-surface-2 px-3.5 text-sm text-ink outline-none transition placeholder:text-muted/50 focus:border-gold/60 focus:ring-4 focus:ring-gold/15';
+const goldButton =
+  'flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#E6C457] to-[#B89428] text-sm font-semibold text-[#0B0F17] shadow-gold-sm transition hover:brightness-[1.04] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,170 +58,124 @@ export default function LoginPage() {
       toast.success('Welcome back to VesperStay');
       router.replace('/dashboard');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Unable to sign in',
-      );
+      toast.error(error instanceof Error ? error.message : 'Unable to sign in');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <>
-      <div className="relative min-h-screen overflow-x-hidden bg-slate-50 dark:bg-[#090D16]">
-        {/* Subtle ambient glow + grid */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,rgba(212,175,55,0.08),transparent_55%)] dark:bg-[radial-gradient(ellipse_60%_40%_at_50%_-5%,rgba(212,175,55,0.10),transparent_50%)]"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.2]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage:
-              'radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent)',
+    <SplitAuthLayout
+      headline="Calm operations for extraordinary stays."
+      subcopy="One console for reservations, housekeeping, POS and every OTA — composed, so your team can focus on the guest."
+      formEyebrow="Welcome back"
+      formTitle="Sign in"
+      formSubtitle="Enter your work credentials to open your console."
+      footer={
+        <>
+          New property?{' '}
+          <Link
+            href="/register"
+            className="font-medium text-ink underline-offset-4 hover:underline"
+          >
+            Create a console
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-5">
+        <button
+          type="button"
+          onClick={() => {
+            setEmail(DEMO_ADMIN.email);
+            setPassword(DEMO_ADMIN.password);
           }}
-        />
+          className="w-full rounded-xl border border-dashed border-line px-3 py-2 text-xs font-medium text-muted transition hover:border-gold/50 hover:text-ink"
+        >
+          Use demo login · admin@vesperstay.com
+        </button>
 
-        <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-          <ThemeToggle />
+        <div>
+          <label htmlFor="email" className={labelClass}>
+            Work email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@property.com"
+            className={inputClass}
+          />
         </div>
 
-        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
-          <div className="w-full max-w-[420px] rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-900/5 dark:border-slate-800 dark:bg-[#111726]">
-            {/* Brand */}
-            <div className="mb-8 flex flex-col items-center text-center">
-              <Link href="/login" className="mb-6 inline-flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold tracking-wide text-white dark:bg-slate-100 dark:text-slate-900">
-                  V
-                </span>
-                <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
-                  VesperStay
-                </span>
-              </Link>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                Sign in to your console
-              </h1>
-              <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                Enter your work credentials to continue.
-              </p>
-            </div>
-
-            <form onSubmit={onSubmit} className="space-y-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(DEMO_ADMIN.email);
-                  setPassword(DEMO_ADMIN.password);
-                }}
-                className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/5 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-300 dark:hover:border-[#D4AF37]/40 dark:hover:text-slate-100"
-              >
-                Demo Login: admin@vesperstay.com
-              </button>
-
-              <div>
-                <label htmlFor="email" className={labelClass}>
-                  Work email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@property.com"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className={labelClass}>
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className={cn(inputClass, 'pr-11')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]/30 dark:border-slate-600 dark:bg-transparent"
-                  />
-                  Remember me
-                </label>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-slate-400 transition hover:text-[#B89428] dark:hover:text-[#D4AF37]"
-                  onClick={() =>
-                    toast.info(
-                      'Password recovery will unlock in a later release.',
-                    )
-                  }
-                >
-                  Forgot password?
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#D4AF37] text-sm font-semibold text-slate-950 shadow-sm transition-all hover:bg-[#C49F27] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in…
-                  </>
-                ) : (
-                  'Sign in'
-                )}
-              </button>
-            </form>
-          </div>
-
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            New property?{' '}
-            <Link
-              href="/register"
-              className="font-medium text-slate-800 underline-offset-4 hover:underline dark:text-slate-200"
+        <div>
+          <label htmlFor="password" className={labelClass}>
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className={cn(inputClass, 'pr-11')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted transition hover:text-ink"
             >
-              Create console
-            </Link>
-          </p>
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-    </>
+
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 rounded border-line accent-[#D4AF37]"
+            />
+            Remember me
+          </label>
+          <button
+            type="button"
+            className="text-sm font-medium text-muted transition hover:text-gold-ink"
+            onClick={() =>
+              toast.info('Password recovery will unlock in a later release.')
+            }
+          >
+            Forgot password?
+          </button>
+        </div>
+
+        <button type="submit" disabled={loading} className={goldButton}>
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Signing in…
+            </>
+          ) : (
+            'Sign in'
+          )}
+        </button>
+      </form>
+    </SplitAuthLayout>
   );
 }

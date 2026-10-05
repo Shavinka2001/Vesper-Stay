@@ -15,6 +15,14 @@ type SplitAuthLayoutProps = {
   footer?: ReactNode;
 };
 
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const HIGHLIGHTS = [
+  'Zero double-booking, by design',
+  'Real-time OTA calendar sync',
+  'WhatsApp guest concierge',
+];
+
 export function SplitAuthLayout({
   children,
   headline,
@@ -25,138 +33,114 @@ export function SplitAuthLayout({
   footer,
 }: SplitAuthLayoutProps) {
   return (
-    <div className="relative min-h-dvh bg-slate-50 text-slate-900 dark:bg-[#0B0F17] dark:text-slate-100 lg:grid lg:grid-cols-12">
-      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+    <div className="relative min-h-dvh bg-bg text-ink lg:grid lg:grid-cols-2 xl:grid-cols-[1.1fr_1fr]">
+      <div className="absolute right-4 top-4 z-30 sm:right-6 sm:top-6">
         <ThemeToggle />
       </div>
 
-      {/* Brand showcase */}
-      <aside className="relative hidden overflow-hidden lg:col-span-7 lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-12 xl:px-16 xl:py-14">
+      {/* ── Brand panel (always twilight obsidian) ───────────────────────── */}
+      <aside className="relative hidden overflow-hidden bg-obsidian-wash lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-14 xl:px-20">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_10%_0%,rgba(212,175,55,0.10),transparent_55%),radial-gradient(ellipse_60%_45%_at_90%_100%,rgba(13,148,136,0.07),transparent_50%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_15%_10%,rgba(212,175,55,0.12),transparent_55%),radial-gradient(ellipse_50%_40%_at_85%_85%,rgba(13,148,136,0.10),transparent_50%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_20%_0%,rgba(212,175,55,0.16),transparent_60%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -left-16 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_70%)]"
         />
 
-        <div className="relative z-10">
-          <Link href="/login" className="inline-flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#D4AF37]/35 bg-[#D4AF37]/10 font-display text-base tracking-[0.12em] text-[#B89428] dark:text-[#D4AF37]">
-              V
-            </span>
-            <div>
-              <p className="font-display text-2xl tracking-[0.04em] text-slate-900 dark:text-slate-100">
-                VesperStay
-              </p>
-              <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                Hospitality console
-              </p>
-            </div>
-          </Link>
-        </div>
+        {/* Wordmark */}
+        <Link href="/login" className="relative z-10 inline-flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E6C457] to-[#B89428] text-lg font-bold text-[#0B0F17] shadow-[0_0_24px_-4px_rgba(212,175,55,0.6)]">
+            V
+          </span>
+          <div>
+            <p className="display text-2xl leading-none text-white">VesperStay</p>
+            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.26em] text-white/45">
+              Hospitality Console
+            </p>
+          </div>
+        </Link>
 
-        <div className="relative z-10 max-w-xl py-12">
+        {/* Headline */}
+        <div className="relative z-10 max-w-lg">
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.4 }}
-            className="mb-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#B89428] dark:text-[#D4AF37]"
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="mb-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#E6C457]"
           >
-            Calm operations
+            Twilight hospitality
           </motion.p>
           <motion.h1
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.14, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="font-display text-4xl leading-[1.12] tracking-tight text-slate-900 xl:text-5xl dark:text-slate-50"
+            transition={{ delay: 0.16, duration: 0.5, ease: EASE }}
+            className="display text-4xl leading-[1.1] text-white xl:text-[52px]"
           >
             {headline}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.22, duration: 0.4 }}
-            className="mt-5 max-w-md text-[15px] leading-relaxed text-slate-500 dark:text-slate-400"
+            transition={{ delay: 0.24, duration: 0.45 }}
+            className="mt-6 max-w-md text-[15px] leading-relaxed text-white/55"
           >
             {subcopy}
           </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.32, duration: 0.4 }}
-            className="mt-10 inline-flex items-center gap-2.5 rounded-full border border-slate-200/80 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm shadow-slate-200/40 dark:border-slate-700/80 dark:bg-[#131B2A] dark:text-slate-300 dark:shadow-none"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            Live OTA Sync Active
-          </motion.div>
-
-          <motion.blockquote
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.42, duration: 0.5 }}
-            className="mt-10 max-w-sm border-l-2 border-[#D4AF37]/50 pl-4 text-sm leading-relaxed text-slate-500 dark:text-slate-400"
-          >
-            “Hospitality software should feel as composed as the properties it
-            serves.”
-          </motion.blockquote>
         </div>
 
-        <p className="relative z-10 max-w-md text-sm leading-relaxed text-slate-400 dark:text-slate-500">
-          Powering elite boutique villas, eco-cabanas, and luxury resorts across
-          the globe.
-        </p>
+        {/* Value highlights */}
+        <motion.ul
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.34, duration: 0.45 }}
+          className="relative z-10 space-y-3"
+        >
+          {HIGHLIGHTS.map((line) => (
+            <li
+              key={line}
+              className="flex items-center gap-3 text-sm text-white/70"
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
+              {line}
+            </li>
+          ))}
+        </motion.ul>
       </aside>
 
-      {/* Console */}
-      <section className="relative flex min-h-dvh flex-col justify-center lg:col-span-5">
-        <div className="relative z-10 px-5 pb-2 pt-8 lg:hidden">
+      {/* ── Form panel ───────────────────────────────────────────────────── */}
+      <section className="relative flex min-h-dvh flex-col justify-center px-5 py-10 sm:px-8">
+        {/* Compact brand for mobile */}
+        <div className="mb-8 lg:hidden">
           <Link href="/login" className="inline-flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 font-display text-sm tracking-[0.12em] text-[#B89428] dark:text-[#D4AF37]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#E6C457] to-[#B89428] text-sm font-bold text-[#0B0F17]">
               V
             </span>
-            <span className="font-display text-xl tracking-[0.04em] text-slate-900 dark:text-slate-100">
-              VesperStay
-            </span>
+            <span className="display text-xl text-ink">VesperStay</span>
           </Link>
-          <p className="mt-6 pr-12 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50">
-            {headline}
-          </p>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-            {subcopy}
-          </p>
         </div>
 
-        <div className="relative z-10 flex flex-1 items-center px-4 py-8 sm:px-8 lg:px-10 xl:px-12">
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="mx-auto w-full max-w-[420px]"
-          >
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/40 sm:p-8 dark:border-slate-800/80 dark:bg-[#131B2A] dark:shadow-none">
-              <div className="mb-7">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#B89428] dark:text-[#D4AF37]">
-                  {formEyebrow}
-                </p>
-                <h2 className="mt-2 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50">
-                  {formTitle}
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                  {formSubtitle}
-                </p>
-              </div>
-              {children}
-            </div>
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: EASE }}
+          className="mx-auto w-full max-w-[400px]"
+        >
+          <div className="mb-7">
+            <p className="eyebrow">{formEyebrow}</p>
+            <h2 className="display mt-2 text-3xl text-ink">{formTitle}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {formSubtitle}
+            </p>
+          </div>
 
-            {footer ? (
-              <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                {footer}
-              </div>
-            ) : null}
-          </motion.div>
-        </div>
+          {children}
+
+          {footer ? (
+            <div className="mt-7 text-center text-sm text-muted">{footer}</div>
+          ) : null}
+        </motion.div>
       </section>
     </div>
   );
